@@ -4,7 +4,7 @@ import { createContext, ReactNode, useContext, useEffect, useMemo, useState } fr
 import { Question } from '../data/questions';
 import { useQuestions } from './QuestionsContext';
 
-const STORAGE_KEY = 'trivia.answers.v2';
+const STORAGE_KEY = 'trivia.answers.v3';
 
 type AnswerRecord = { selected: string; isCorrect: boolean };
 type Answers = Record<string, AnswerRecord>;

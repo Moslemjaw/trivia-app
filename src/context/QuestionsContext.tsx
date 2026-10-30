@@ -1,36 +1,40 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
-import { fetchQuestions } from '../api/opentdb';
+import { GenerationError, generateQuestions } from '../api/openrouter';
 import { Question } from '../data/questions';
 
-const STORAGE_KEY = 'trivia.questions.v1';
+const STORAGE_KEY = 'trivia.questions.v2';
 
 type QuestionsContextValue = {
   questions: Question[];
+  isRestoring: boolean;
   isLoading: boolean;
-  hasError: boolean;
-  loadQuestions: () => Promise<boolean>;
+  errorMessage: string | null;
+  loadQuestions: (category: string) => Promise<boolean>;
 };
 
 const QuestionsContext = createContext<QuestionsContextValue | null>(null);
 
 export function QuestionsProvider({ children }: { children: ReactNode }) {
   const [questions, setQuestions] = useState<Question[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [hasError, setHasError] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const loadQuestions = useCallback(async () => {
+  const loadQuestions = useCallback(async (category: string) => {
     setIsLoading(true);
-    setHasError(false);
+    setErrorMessage(null);
     try {
-      const fetched = await fetchQuestions();
-      setQuestions(fetched);
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(fetched));
+      const generated = await generateQuestions(category);
+      setQuestions(generated);
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(generated));
       return true;
     } catch (error) {
-      console.warn('Could not load questions', error);
-      setHasError(true);
+      console.warn('Could not generate questions', error);
+      setErrorMessage(
+        error instanceof GenerationError ? error.message : 'Couldn’t generate questions. Try again.',
+      );
       return false;
     } finally {
       setIsLoading(false);
@@ -40,23 +44,16 @@ export function QuestionsProvider({ children }: { children: ReactNode }) {
   // Reopening the app keeps the current questions, so saved answers still match them.
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY)
-      .catch((error) => {
-        console.warn('Could not read saved questions', error);
-        return null;
-      })
       .then((saved) => {
-        if (saved) {
-          setQuestions(JSON.parse(saved));
-          setIsLoading(false);
-        } else {
-          loadQuestions();
-        }
-      });
-  }, [loadQuestions]);
+        if (saved) setQuestions(JSON.parse(saved));
+      })
+      .catch((error) => console.warn('Could not read saved questions', error))
+      .finally(() => setIsRestoring(false));
+  }, []);
 
   const value = useMemo(
-    () => ({ questions, isLoading, hasError, loadQuestions }),
-    [questions, isLoading, hasError, loadQuestions],
+    () => ({ questions, isRestoring, isLoading, errorMessage, loadQuestions }),
+    [questions, isRestoring, isLoading, errorMessage, loadQuestions],
   );
 
   return <QuestionsContext.Provider value={value}>{children}</QuestionsContext.Provider>;

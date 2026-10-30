@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   FlatList,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -11,6 +12,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { CategoryPicker } from '../components/CategoryPicker';
 import { QuestionCard } from '../components/QuestionCard';
 import { ScoreTracker } from '../components/ScoreTracker';
 import { useQuestions } from '../context/QuestionsContext';
@@ -22,7 +24,8 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Questions'>;
 
 export function QuestionListScreen({ navigation }: Props) {
   const [search, setSearch] = useState('');
-  const { questions, isLoading, hasError, loadQuestions } = useQuestions();
+  const [isPicking, setIsPicking] = useState(false);
+  const { questions, isRestoring, isLoading, errorMessage, loadQuestions } = useQuestions();
   const { answers, resetScore } = useScore();
   const insets = useSafeAreaInsets();
 
@@ -34,40 +37,37 @@ export function QuestionListScreen({ navigation }: Props) {
     });
   }, [questions, search]);
 
-  const loadNewQuestions = async () => {
+  const generate = async (category: string) => {
     // A failed request keeps the current questions, so only reset after a success.
-    if (await loadQuestions()) {
+    if (await loadQuestions(category)) {
       resetScore();
       setSearch('');
+      setIsPicking(false);
     }
   };
 
-  const loadButton = (
-    <Pressable
-      disabled={isLoading}
-      onPress={loadNewQuestions}
-      accessibilityRole="button"
-      accessibilityState={{ disabled: isLoading }}
-      style={[styles.button, isLoading && styles.buttonDisabled]}
-    >
-      <Text style={styles.buttonText}>
-        {isLoading ? 'Loading…' : questions.length > 0 ? 'Get new questions' : 'Try again'}
-      </Text>
-    </Pressable>
-  );
-
-  const errorMessage = hasError && (
-    <Text style={styles.error} accessibilityLiveRegion="polite">
-      Couldn’t load questions. Check your connection and try again.
-    </Text>
-  );
-
-  if (questions.length === 0) {
+  if (isRestoring) {
     return (
       <View style={[styles.screen, styles.centered]}>
-        {isLoading ? <ActivityIndicator size="large" color={colors.primary} /> : errorMessage}
-        {!isLoading && loadButton}
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
+    );
+  }
+
+  if (isPicking || questions.length === 0) {
+    return (
+      <ScrollView
+        style={styles.screen}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}
+      >
+        <CategoryPicker
+          isLoading={isLoading}
+          errorMessage={errorMessage}
+          onGenerate={generate}
+          onCancel={questions.length > 0 ? () => setIsPicking(false) : undefined}
+        />
+      </ScrollView>
     );
   }
 
@@ -103,10 +103,13 @@ export function QuestionListScreen({ navigation }: Props) {
           <Text style={styles.empty}>No questions match “{search.trim()}”.</Text>
         }
         ListFooterComponent={
-          <View style={styles.footer}>
-            {errorMessage}
-            {loadButton}
-          </View>
+          <Pressable
+            onPress={() => setIsPicking(true)}
+            accessibilityRole="button"
+            style={styles.button}
+          >
+            <Text style={styles.buttonText}>Choose a new category</Text>
+          </Pressable>
         }
       />
     </View>
@@ -121,8 +124,6 @@ const styles = StyleSheet.create({
   centered: {
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
-    gap: 16,
   },
   header: {
     paddingHorizontal: 16,
@@ -151,25 +152,13 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: colors.textMuted,
   },
-  footer: {
-    gap: 12,
-    marginTop: 4,
-  },
-  error: {
-    textAlign: 'center',
-    fontSize: 15,
-    color: colors.incorrect,
-  },
   button: {
     minHeight: 50,
-    alignSelf: 'stretch',
+    marginTop: 4,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 12,
     backgroundColor: colors.primary,
-  },
-  buttonDisabled: {
-    opacity: 0.45,
   },
   buttonText: {
     fontSize: 16,
