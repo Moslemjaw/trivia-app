@@ -4,8 +4,8 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ScoreTracker } from '../components/ScoreTracker';
+import { useQuestions } from '../context/QuestionsContext';
 import { useScore } from '../context/ScoreContext';
-import { QUESTIONS } from '../data/questions';
 import { RootStackParamList } from '../navigation';
 import { colors, difficultyColors } from '../theme';
 
@@ -17,15 +17,16 @@ export function QuestionDetailScreen({ route, navigation }: Props) {
   const [draft, setDraft] = useState<string | null>(null);
   const insets = useSafeAreaInsets();
 
-  const questionIndex = QUESTIONS.findIndex((item) => item.id === questionId);
-  const question = QUESTIONS[questionIndex];
+  const { questions } = useQuestions();
+  const questionIndex = questions.findIndex((item) => item.id === questionId);
+  const question = questions[questionIndex];
   if (!question) {
     return <Text style={styles.missing}>This question could not be found.</Text>;
   }
 
   const answer = answers[question.id];
   const selected = answer?.selected ?? draft;
-  const nextQuestion = QUESTIONS[questionIndex + 1];
+  const nextQuestion = questions[questionIndex + 1];
   const difficulty = difficultyColors[question.difficulty];
 
   return (

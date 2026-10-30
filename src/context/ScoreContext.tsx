@@ -1,9 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from 'react';
 
-import { Question, QUESTIONS } from '../data/questions';
+import { Question } from '../data/questions';
+import { useQuestions } from './QuestionsContext';
 
-const STORAGE_KEY = 'trivia.answers.v1';
+const STORAGE_KEY = 'trivia.answers.v2';
 
 type AnswerRecord = { selected: string; isCorrect: boolean };
 type Answers = Record<string, AnswerRecord>;
@@ -22,6 +23,8 @@ const ScoreContext = createContext<ScoreContextValue | null>(null);
 export function ScoreProvider({ children }: { children: ReactNode }) {
   const [answers, setAnswers] = useState<Answers>({});
   const [isLoaded, setIsLoaded] = useState(false);
+  const { questions } = useQuestions();
+  const totalCount = questions.length;
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY)
@@ -48,7 +51,7 @@ export function ScoreProvider({ children }: { children: ReactNode }) {
       answers,
       correctCount: records.filter((record) => record.isCorrect).length,
       answeredCount: records.length,
-      totalCount: QUESTIONS.length,
+      totalCount,
       submitAnswer: (question, selected) =>
         setAnswers((current) =>
           current[question.id]
@@ -60,7 +63,7 @@ export function ScoreProvider({ children }: { children: ReactNode }) {
         ),
       resetScore: () => setAnswers({}),
     };
-  }, [answers]);
+  }, [answers, totalCount]);
 
   return <ScoreContext.Provider value={value}>{children}</ScoreContext.Provider>;
 }
